@@ -1,5 +1,6 @@
 import User from "../model/userModel.js";
 import bcrypt from "bcrypt";
+import generateTokenAndSetCookie from "../utils/webToken.js";
 
 export const signup = async (req, res) => {
   try {
@@ -34,6 +35,9 @@ export const signup = async (req, res) => {
     });
 
     if (newUser) {
+      //jwt generation
+      generateTokenAndSetCookie(newUser._id, res);
+
       newUser.save(); //to save to databse
 
       res.status(201).json({
@@ -46,15 +50,44 @@ export const signup = async (req, res) => {
       res.status(400).json({ error: "Invalid user data" });
     }
   } catch (error) {
-    console.log("Error in signup controller ", error.message);
+    console.log("Error in signup controller : ", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-export const login = (req, res) => {
-  console.log("login");
+export const login = async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+    const isPasswordCorrect = await bcrypt.compare(
+      password,
+      user?.password || ""
+    );
+
+    if (!user || !isPasswordCorrect) {
+      res.status(400).json({ error: "Invalid username or password" });
+    }
+
+    generateTokenAndSetCookie(user._id, res);
+
+    res.status(200).json({
+      _id: user._id,
+      fullName: user.fullName,
+      username: user.username,
+      profilePic: user.profilePic,
+    });
+  } catch (error) {
+    console.log("Error in signin controller : ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
 
-export const logout = (req, res) => {
-  console.log("logout");
+export const logout = async (req, res) => {
+  try {
+    res.cookie("jwt", "", { maxAge: 0 });
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.log("Error in logout controller : ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
